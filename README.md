@@ -1,3 +1,9 @@
+# Modifications I'm performing
+- Automatically apply to every site (no need to click the browser extension icon for each one)
+- No longer throws the CSP away, instead just adds the domains we need to it.
+
+# Pre-existing
+
 Disable Content-Security-Policy (CSP) in Chromium browsers for web application testing.
 
 * [Install for Chrome](https://chrome.google.com/webstore/detail/disable-content-security/ieelmcmcagommplceebfedjlakkhpden)
