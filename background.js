@@ -1,40 +1,29 @@
 /* global chrome */
 
-// List of tabIds where CSP headers are disabled
-var disabledTabIds = [];
+//TODO: Expose this in a UI element
+var desired_domains = ['http://localhost:*'];
 
-var isCSPDisabled = function (tabId) {
-  return disabledTabIds.includes(tabId);
-};
-
-var toggleDisableCSP = function (tabId) {
-  if (isCSPDisabled(tabId)) {
-    // remove this tabId from disabledTabIds
-    disabledTabIds = disabledTabIds.filter(function (val) {
-      return val !== tabId;
-    });
-  } else {
-    disabledTabIds.push(tabId);
-
-    // Sites that use Application Cache to cache their HTML document means this
-    // extension is not able to alter HTTP response headers (as there is no HTTP
-    // request when serving documents from the cache).
-    //
-    // An example page that this fixes is https://web.whatsapp.com
-    chrome.browsingData.remove({}, { serviceWorkers: true }, function () {});
-  }
-
-  updateUI(tabId);
-};
+/*CSP comes across as a String looking like:
+*   default-src 'self'; script-src 'report-sample' 'self' www.google-analytics.com/analytics.js assets.codepen.io production-assets.codepen.io 'sha256-GA8+DpFnqAM/vwERTpb5zyLUaN5KnOhctfTsqWfhaUA=' 'sha256-uogddBLIKmJa413dyT0iPejBg3VFcO+4x6B+vw3jng0='; script-src-elem 'report-sample' 'self' www.google-analytics.com/analytics.js assets.codepen.io production-assets.codepen.io 'sha256-GA8+DpFnqAM/vwERTpb5zyLUaN5KnOhctfTsqWfhaUA=' 'sha256-uogddBLIKmJa413dyT0iPejBg3VFcO+4x6B+vw3jng0='; style-src 'report-sample' 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; connect-src 'self' updates.developer.allizom.org updates.developer.mozilla.org www.google-analytics.com stats.g.doubleclick.net; font-src 'self'; frame-src 'self' interactive-examples.mdn.mozilla.net interactive-examples.prod.mdn.mozilla.net interactive-examples.stage.mdn.mozilla.net mdn.github.io yari-demos.prod.mdn.mozit.cloud mdn.mozillademos.org yari-demos.stage.mdn.mozit.cloud jsfiddle.net www.youtube-nocookie.com codepen.io survey.alchemer.com; img-src 'self' *.githubusercontent.com *.googleusercontent.com *.gravatar.com mozillausercontent.com firefoxusercontent.com profile.stage.mozaws.net profile.accounts.firefox.com mdn.mozillademos.org media.prod.mdn.mozit.cloud media.stage.mdn.mozit.cloud interactive-examples.mdn.mozilla.net interactive-examples.prod.mdn.mozilla.net interactive-examples.stage.mdn.mozilla.net wikipedia.org www.google-analytics.com www.gstatic.com; manifest-src 'self'; media-src 'self' archive.org videos.cdn.mozilla.net; child-src 'self'; worker-src 'self';
+* Split on ";", append our desired domains to each restriction group, re-assemble the string
+*/
+function re_write_csp(val){
+  var split = val.split(";"); 
+        
+  split = split.map(x => x + " " + desired_domains.join(" "));
+  return split.join(";")
+}
 
 var onHeadersReceived = function (details) {
-  if (!isCSPDisabled(details.tabId)) {
-    return;
-  }
-
   for (var i = 0; i < details.responseHeaders.length; i++) {
-    if (details.responseHeaders[i].name.toLowerCase() === 'content-security-policy') {
-      details.responseHeaders[i].value = '';
+    var header = details.responseHeaders[i];
+    if (header.name.toLowerCase() === 'content-security-policy') {
+      var val = header.value.trim();
+      if (val){
+        header.value = re_write_csp(val);
+        console.log(`Rewrote to ${header.value}`);
+        // header.value = ""; // Prior implementation or just clearing it out.
+      }
     }
   }
 
@@ -43,31 +32,12 @@ var onHeadersReceived = function (details) {
   };
 };
 
-var updateUI = function (tabId) {
-  var isDisabled = isCSPDisabled(tabId);
-  var iconName = isDisabled ? 'on' : 'off';
-  var title = isDisabled ? 'disabled' : 'enabled';
-
-  chrome.browserAction.setIcon({ path: 'images/icon38-' + iconName + '.png' });
-  chrome.browserAction.setTitle({ title: 'Content-Security-Policy headers are ' + title + ' for this tab' });
-};
-
 var init = function () {
   // When Chrome recieves some headers
   var onHeaderFilter = { urls: ['*://*/*'], types: ['main_frame', 'sub_frame'] };
   chrome.webRequest.onHeadersReceived.addListener(
     onHeadersReceived, onHeaderFilter, ['blocking', 'responseHeaders']
   );
-
-  // When the user clicks the plugin icon
-  chrome.browserAction.onClicked.addListener(function (tab) {
-    toggleDisableCSP(tab.id);
-  });
-
-  // When the user changes tab
-  chrome.tabs.onActivated.addListener(function (activeInfo) {
-    updateUI(activeInfo.tabId);
-  });
 
   // onAttached
 };
