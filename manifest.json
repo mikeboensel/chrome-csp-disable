@@ -1,5 +1,5 @@
 {
-  "name": "Disable Content-Security-Policy",
+  "name": "Content-Security-Policy Rewriter",
   "default_locale": "en",
   "description": "__MSG_extDescription__",
   "version": "3.0.0",
@@ -18,7 +18,7 @@
     "persistent": true
   },
   "browser_action": {
-    "default_title": "Content-Security-Policy headers are enabled",
+    "default_title": "Content-Security-Policy headers are unaltered",
     "default_icon": {
       "16": "images/icon38-off.png"
     }
